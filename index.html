@@ -899,7 +899,6 @@ let estado = null;
 async function salvar(campos = null) {
   setSyncDot('loading');
   try { localStorage.setItem('mrt_backup', JSON.stringify(estado)); } catch(e) {}
-  ultimoEstadoJSON = '';
   renderizar(true);
   if(campos) {
     const parcial = {};
@@ -1097,15 +1096,9 @@ const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 // ── RENDER ────────────────────────────────────────────────────────────────────
 let chart = null;
 let paginaAtiva = 'home';
-let ultimoEstadoJSON = '';
 
 function renderizar(forcarTudo = false) {
   if(!estado) return;
-
-  // Evita re-render quando estado não mudou (ex: onSnapshot duplicado)
-  const estadoJSON = JSON.stringify(estado);
-  if(!forcarTudo && estadoJSON === ultimoEstadoJSON) return;
-  ultimoEstadoJSON = estadoJSON;
 
   const {dividas,receitas,gastos,historico} = estado;
 
@@ -1374,12 +1367,7 @@ async function init() {
       logDebug('onSnapshot recebido!');
       clearTimeout(timeoutId);
       if(snap.exists()) {
-        const dadosFirebase = migrarEstado(snap.data());
-        const jsonFirebase  = JSON.stringify(dadosFirebase);
-
-        // Firebase sempre atualiza — ultimoEstadoJSON só evita loop do próprio save
-        ultimoEstadoJSON = jsonFirebase;
-        estado = dadosFirebase;
+        estado = migrarEstado(snap.data());
         verificarResetMensal();
         renderizar(true);
         setSyncDot('ok');
