@@ -900,7 +900,6 @@ async function salvar(campos = null) {
   setSyncDot('loading');
   try { localStorage.setItem('mrt_backup', JSON.stringify(estado)); } catch(e) {}
   ultimoEstadoJSON = '';
-  // Renderiza imediatamente sem esperar Firebase (UI instantânea)
   renderizar(true);
   if(campos) {
     const parcial = {};
@@ -1335,17 +1334,17 @@ async function init() {
   document.getElementById('data-hoje').textContent =
     new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
 
-  // 1. Tenta carregar backup local imediatamente (sem esperar Firebase)
+  // Backup local só pra mostrar algo enquanto Firebase carrega
   try {
     const backup = localStorage.getItem('mrt_backup');
     if(backup) {
       estado = migrarEstado(JSON.parse(backup));
       renderizar(true);
       esconderLoading();
+      // NÃO seta ultimoEstadoJSON aqui — Firebase sempre vai sobrescrever
     }
   } catch(e) {}
 
-  // 2. Timeout de segurança: se Firebase não responder em 6s, usa INICIAIS
   const timeoutId = setTimeout(() => {
     if(!estado) {
       estado = migrarEstado(JSON.parse(JSON.stringify(INICIAIS)));
@@ -1363,9 +1362,14 @@ async function init() {
     onSnapshot(REF, snap => {
       clearTimeout(timeoutId);
       if(snap.exists()) {
-        estado = migrarEstado(snap.data());
+        const dadosFirebase = migrarEstado(snap.data());
+        const jsonFirebase  = JSON.stringify(dadosFirebase);
+
+        // Firebase sempre atualiza — ultimoEstadoJSON só evita loop do próprio save
+        ultimoEstadoJSON = jsonFirebase;
+        estado = dadosFirebase;
         verificarResetMensal();
-        renderizar();
+        renderizar(true);
         setSyncDot('ok');
         esconderLoading();
         try { localStorage.setItem('mrt_backup', JSON.stringify(estado)); } catch(e) {}
