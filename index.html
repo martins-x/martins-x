@@ -1329,6 +1329,14 @@ function esconderLoading() {
   if(el) el.style.display = 'none';
 }
 
+function logDebug(msg) {
+  const el = document.getElementById('loading');
+  if(el) {
+    const p = el.querySelector('p');
+    if(p) p.textContent = msg;
+  }
+}
+
 // ── INIT ──────────────────────────────────────────────────────────────────────
 async function init() {
   document.getElementById('data-hoje').textContent =
@@ -1354,12 +1362,16 @@ async function init() {
   }, 6000);
 
   try {
+    logDebug('tentando getDoc...');
     const snap = await getDoc(REF);
+    logDebug('getDoc ok, verificando documento...');
     if(!snap.exists()) {
+      logDebug('doc nao existe, criando...');
       await setDoc(REF, INICIAIS);
     }
-
+    logDebug('iniciando onSnapshot...');
     onSnapshot(REF, snap => {
+      logDebug('onSnapshot recebido!');
       clearTimeout(timeoutId);
       if(snap.exists()) {
         const dadosFirebase = migrarEstado(snap.data());
@@ -1376,6 +1388,7 @@ async function init() {
       }
     });
   } catch(err) {
+    logDebug('ERRO: ' + err.message);
     clearTimeout(timeoutId);
     if(!estado) {
       estado = migrarEstado(JSON.parse(JSON.stringify(INICIAIS)));
