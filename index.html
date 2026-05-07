@@ -898,10 +898,18 @@ let estado = null;
 // ── SALVAR COM MERGE (menos escrita no Firestore) ────────────────────────────
 async function salvar() {
   setSyncDot('loading');
-  try { localStorage.setItem('mrt_backup', JSON.stringify(estado)); } catch(e) {}
-  renderizar(true);
   await setDoc(REF, estado);
   setSyncDot('ok');
+}
+
+function logDebug(msg) {
+  const el = document.getElementById('loading');
+  if(el) { const p = el.querySelector('p'); if(p) p.textContent = msg; }
+}
+
+function esconderLoading() {
+  const el = document.getElementById('loading');
+  if(el) el.style.display = 'none';
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -1296,8 +1304,34 @@ window.notif = function(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
 };
 
-// ── MIGRAÇÃO: garante que dívidas antigas tenham campo tipo ───────────────────
-function migrarEstado(e) {
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function init() {
+  document.getElementById('data-hoje').textContent =
+    new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
+
+  try {
+    const snap = await getDoc(REF);
+    if(!snap.exists()) await setDoc(REF, INICIAIS);
+
+    onSnapshot(REF, snap => {
+      if(snap.exists()) {
+        estado = migrarEstado(snap.data());
+        verificarResetMensal();
+        renderizar(true);
+        setSyncDot('ok');
+        esconderLoading();
+      }
+    });
+  } catch(err) {
+    // Sem conexão — mostra dados iniciais
+    estado = migrarEstado(JSON.parse(JSON.stringify(INICIAIS)));
+    renderizar(true);
+    esconderLoading();
+    setSyncDot('');
+  }
+}
+
+init();
   if(!e) return e;
   if(!e.gastos)    e.gastos = [];
   if(!e.receitas)  e.receitas = [];
@@ -1309,76 +1343,6 @@ function migrarEstado(e) {
     ...d,                    // tipo do Firestore sobrescreve se já existir
   }));
   return e;
-}
-
-function esconderLoading() {
-  const el = document.getElementById('loading');
-  if(el) el.style.display = 'none';
-}
-
-function logDebug(msg) {
-  const el = document.getElementById('loading');
-  if(el) {
-    const p = el.querySelector('p');
-    if(p) p.textContent = msg;
-  }
-}
-
-// ── INIT ──────────────────────────────────────────────────────────────────────
-async function init() {
-  document.getElementById('data-hoje').textContent =
-    new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
-
-  // Backup local só pra mostrar algo enquanto Firebase carrega
-  try {
-    const backup = localStorage.getItem('mrt_backup');
-    if(backup) {
-      estado = migrarEstado(JSON.parse(backup));
-      renderizar(true);
-      esconderLoading();
-      // NÃO seta ultimoEstadoJSON aqui — Firebase sempre vai sobrescrever
-    }
-  } catch(e) {}
-
-  const timeoutId = setTimeout(() => {
-    if(!estado) {
-      estado = migrarEstado(JSON.parse(JSON.stringify(INICIAIS)));
-      renderizar(true);
-      esconderLoading();
-    }
-  }, 6000);
-
-  try {
-    logDebug('tentando getDoc...');
-    const snap = await getDoc(REF);
-    logDebug('getDoc ok, verificando documento...');
-    if(!snap.exists()) {
-      logDebug('doc nao existe, criando...');
-      await setDoc(REF, INICIAIS);
-    }
-    logDebug('iniciando onSnapshot...');
-    onSnapshot(REF, snap => {
-      logDebug('onSnapshot recebido!');
-      clearTimeout(timeoutId);
-      if(snap.exists()) {
-        estado = migrarEstado(snap.data());
-        verificarResetMensal();
-        renderizar(true);
-        setSyncDot('ok');
-        esconderLoading();
-        try { localStorage.setItem('mrt_backup', JSON.stringify(estado)); } catch(e) {}
-      }
-    });
-  } catch(err) {
-    logDebug('ERRO: ' + err.message);
-    clearTimeout(timeoutId);
-    if(!estado) {
-      estado = migrarEstado(JSON.parse(JSON.stringify(INICIAIS)));
-      renderizar(true);
-      esconderLoading();
-    }
-    setSyncDot('');
-  }
 }
 
 init();
