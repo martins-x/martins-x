@@ -748,12 +748,17 @@ select option { background: var(--s2); }
       </div>
       <div>
         <label>Grupo</label>
-        <select id="d-grupo">
+        <select id="d-grupo" onchange="onGrupoChange()">
           <option>Cartão Sicredi</option>
           <option>Carteira</option>
           <option>Gang</option>
           <option>Outros</option>
+          <option value="__novo__">+ Criar novo grupo...</option>
         </select>
+      </div>
+      <div id="d-grupo-novo-wrap" style="display:none">
+        <label>Nome do novo grupo</label>
+        <input type="text" id="d-grupo-novo" placeholder="ex: Cartão Nubank">
       </div>
     </div>
     <button class="btn btn-green" onclick="adicionarDivida()">Adicionar dívida</button>
@@ -993,13 +998,38 @@ window.limparGastosMes = async function() {
 };
 
 // ── DÍVIDAS ───────────────────────────────────────────────────────────────────
+window.onGrupoChange = function() {
+  const sel = document.getElementById('d-grupo');
+  const wrap = document.getElementById('d-grupo-novo-wrap');
+  wrap.style.display = sel.value === '__novo__' ? '' : 'none';
+  if(sel.value === '__novo__') {
+    document.getElementById('d-grupo-novo').focus();
+  }
+};
+
 window.adicionarDivida = async function() {
   const nome     = document.getElementById('d-nome').value.trim();
   const valor    = parseFloat(document.getElementById('d-valor').value);
-  const tipo     = document.getElementById('d-tipo').value; // 'parcelas' ou 'assinatura'
+  const tipo     = document.getElementById('d-tipo').value;
   const parcelas = tipo === 'assinatura' ? 0 : (parseInt(document.getElementById('d-parcelas').value)||1);
   const dia      = parseInt(document.getElementById('d-dia').value)||null;
-  const grupo    = document.getElementById('d-grupo').value;
+
+  // Pega grupo — se for novo, usa o campo de texto
+  const selGrupo = document.getElementById('d-grupo');
+  let grupo = selGrupo.value;
+  if(grupo === '__novo__') {
+    grupo = document.getElementById('d-grupo-novo').value.trim();
+    if(!grupo) { notif('⚠️ Digite o nome do novo grupo!'); return; }
+    // Adiciona no select para usar de novo
+    const opt = document.createElement('option');
+    opt.value = grupo;
+    opt.textContent = grupo;
+    selGrupo.insertBefore(opt, selGrupo.querySelector('[value="__novo__"]'));
+    selGrupo.value = grupo;
+    document.getElementById('d-grupo-novo-wrap').style.display = 'none';
+    document.getElementById('d-grupo-novo').value = '';
+  }
+
   if(!nome||isNaN(valor)||valor<=0){ notif('⚠️ Preencha nome e valor!'); return; }
   estado.dividas.push({
     id: estado.nid++, nome, valor, tipo,
