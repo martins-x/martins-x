@@ -896,17 +896,11 @@ const INICIAIS = {
 let estado = null;
 
 // ── SALVAR COM MERGE (menos escrita no Firestore) ────────────────────────────
-async function salvar(campos = null) {
+async function salvar() {
   setSyncDot('loading');
   try { localStorage.setItem('mrt_backup', JSON.stringify(estado)); } catch(e) {}
   renderizar(true);
-  if(campos) {
-    const parcial = {};
-    campos.forEach(c => { parcial[c] = estado[c]; });
-    await setDoc(REF, parcial, { merge: true });
-  } else {
-    await setDoc(REF, estado);
-  }
+  await setDoc(REF, estado);
   setSyncDot('ok');
 }
 
@@ -945,7 +939,7 @@ function verificarResetMensal() {
   regHist('reset', 'Reset mensal automático', 0);
 
   // Salva imediatamente após o reset
-  salvar(['dividas', 'gastos', 'mesFechado', 'historico']);
+  salvar();
 }
 
 // ── WATCHDOG DE VIRADA DE MÊS (verifica a cada hora, funciona com app aberto) ─
@@ -983,7 +977,7 @@ window.adicionarGasto = async function() {
   const nome = desc || cat.label;
   estado.gastos.push({ id:estado.nid++, nome, categoria:catSelecionada, emoji:cat.emoji, valor, data:new Date().toISOString() });
   regHist('gasto',`${cat.emoji} ${nome}`,valor);
-  await salvar(['gastos','historico','nid']); renderizar();
+  await salvar(); renderizar();
   document.getElementById('g-valor').value='';
   document.getElementById('g-desc').value='';
   notif(`${cat.emoji} R$ ${valor.toFixed(2).replace('.',',')} anotado!`);
@@ -991,12 +985,12 @@ window.adicionarGasto = async function() {
 
 window.removerGasto = async function(id) {
   estado.gastos = estado.gastos.filter(g=>g.id!==id);
-  await salvar(['gastos']); renderizar(); notif('🗑 Removido');
+  await salvar(); renderizar(); notif('🗑 Removido');
 };
 
 window.limparGastosMes = async function() {
   estado.gastos = [];
-  await salvar(['gastos']); renderizar(); notif('🗑 Gastos do mês limpos');
+  await salvar(); renderizar(); notif('🗑 Gastos do mês limpos');
 };
 
 // ── DÍVIDAS ───────────────────────────────────────────────────────────────────
@@ -1014,7 +1008,7 @@ window.adicionarDivida = async function() {
     dia, grupo, pago: false
   });
   regHist('adicionado', nome, valor);
-  await salvar(['dividas','historico','nid']); renderizar();
+  await salvar(); renderizar();
   ['d-nome','d-valor','d-dia'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('d-parcelas').value='1';
   notif(tipo==='assinatura' ? `♾ Assinatura "${nome}" adicionada!` : '✅ Dívida adicionada!');
@@ -1047,14 +1041,14 @@ window.pagarParcela = async function(id) {
   }
 
   regHist('pago', d.nome, d.valor);
-  await salvar(['dividas','historico']); renderizar();
+  await salvar(); renderizar();
 };
 
 window.removerDivida = async function(id) {
   const d = estado.dividas.find(d=>d.id===id);
   if(d) regHist('removido',d.nome,d.valor);
   estado.dividas = estado.dividas.filter(d=>d.id!==id);
-  await salvar(['dividas','historico']); renderizar(); notif('🗑 Removido');
+  await salvar(); renderizar(); notif('🗑 Removido');
 };
 
 window.redefinirDividas = async function() {
@@ -1062,7 +1056,7 @@ window.redefinirDividas = async function() {
   estado.dividas = JSON.parse(JSON.stringify(INICIAIS.dividas));
   estado.nid = INICIAIS.nid;
   regHist('reset', 'Dívidas redefinidas para padrão', 0);
-  await salvar(['dividas','nid','historico']);
+  await salvar();
   notif('✅ Dívidas redefinidas!');
 };
 
@@ -1075,19 +1069,19 @@ window.adicionarReceita = async function() {
   if(!nome||isNaN(valor)||valor<=0){ notif('⚠️ Preencha nome e valor!'); return; }
   estado.receitas.push({id:estado.nid++,nome,valor,dia,tipo});
   regHist('receita',nome,valor);
-  await salvar(['receitas','historico','nid']); renderizar();
+  await salvar(); renderizar();
   ['r-nome','r-valor','r-dia'].forEach(id=>document.getElementById(id).value='');
   notif('✅ Receita adicionada!');
 };
 
 window.removerReceita = async function(id) {
   estado.receitas = estado.receitas.filter(r=>r.id!==id);
-  await salvar(['receitas']); renderizar(); notif('🗑 Removido');
+  await salvar(); renderizar(); notif('🗑 Removido');
 };
 
 window.limparHist = async function() {
   estado.historico = [];
-  await salvar(['historico']); renderizar(); notif('🗑 Histórico limpo');
+  await salvar(); renderizar(); notif('🗑 Histórico limpo');
 };
 
 // ── SANITIZE (previne XSS ao inserir nomes no innerHTML) ─────────────────────
