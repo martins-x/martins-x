@@ -757,6 +757,7 @@ select option { background: var(--s2); }
       </div>
     </div>
     <button class="btn btn-green" onclick="adicionarDivida()">Adicionar dívida</button>
+    <button class="btn btn-ghost" style="margin-top:8px" onclick="redefinirDividas()">🔄 Redefinir dívidas para padrão</button>
   </div>
 </div>
 
@@ -872,12 +873,13 @@ const INICIAIS = {
   dividas: [
     { id:1,  nome:"Discord",            valor:24.99,  tipo:'assinatura', parcelas:0, restantes:0, dia:null, grupo:"Cartão Sicredi", pago:false },
     { id:2,  nome:"Apple",              valor:5.90,   tipo:'assinatura', parcelas:0, restantes:0, dia:null, grupo:"Cartão Sicredi", pago:false },
-    { id:3,  nome:"Spotify",            valor:34.99,  tipo:'assinatura', parcelas:0, restantes:0, dia:null, grupo:"Cartão Sicredi", pago:false },
+    { id:3,  nome:"Spotify",            valor:40.90,  tipo:'assinatura', parcelas:0, restantes:0, dia:null, grupo:"Cartão Sicredi", pago:false },
     { id:4,  nome:"Vivo",               valor:37.50,  tipo:'assinatura', parcelas:0, restantes:0, dia:null, grupo:"Cartão Sicredi", pago:false },
     { id:5,  nome:"Academia",           valor:57.00,  tipo:'assinatura', parcelas:0, restantes:0, dia:null, grupo:"Cartão Sicredi", pago:false },
-    { id:6,  nome:"Curso",              valor:31.11,  tipo:'assinatura', parcelas:0, restantes:0, dia:null, grupo:"Cartão Sicredi", pago:false },
-    { id:7,  nome:"Shopee",             valor:77.04,  tipo:'parcelas',   parcelas:5, restantes:5, dia:null, grupo:"Cartão Sicredi", pago:false },
-    { id:8,  nome:"Honda",              valor:60.00,  tipo:'parcelas',   parcelas:3, restantes:3, dia:null, grupo:"Cartão Sicredi", pago:false },
+    { id:7,  nome:"Shopee",             valor:77.04,  tipo:'parcelas',   parcelas:4, restantes:4, dia:null, grupo:"Cartão Sicredi", pago:false },
+    { id:8,  nome:"Honda",              valor:60.00,  tipo:'parcelas',   parcelas:2, restantes:2, dia:null, grupo:"Cartão Sicredi", pago:false },
+    { id:13, nome:"Tenis",              valor:71.98,  tipo:'parcelas',   parcelas:4, restantes:4, dia:5,    grupo:"Cartão Sicredi", pago:false },
+    { id:14, nome:"Mousepad",           valor:15.65,  tipo:'parcelas',   parcelas:9, restantes:9, dia:5,    grupo:"Cartão Sicredi", pago:false },
     { id:9,  nome:"Tio Ângelo",         valor:460.85, tipo:'parcelas',   parcelas:3, restantes:3, dia:null, grupo:"Carteira",       pago:false },
     { id:10, nome:"Cartão Caixa",       valor:179.21, tipo:'parcelas',   parcelas:5, restantes:5, dia:null, grupo:"Carteira",       pago:false },
     { id:11, nome:"Gang",               valor:85.47,  tipo:'parcelas',   parcelas:3, restantes:3, dia:null, grupo:"Gang",           pago:false },
@@ -887,7 +889,7 @@ const INICIAIS = {
   gastos: [],
   historico: [],
   mesFechado: '',
-  nid: 13
+  nid: 15
 };
 
 // ── ESTADO ─────────────────────────────────────────────────────────────────────
@@ -897,8 +899,9 @@ let estado = null;
 async function salvar(campos = null) {
   setSyncDot('loading');
   try { localStorage.setItem('mrt_backup', JSON.stringify(estado)); } catch(e) {}
-  // Reseta o cache de JSON para garantir que o onSnapshot sempre re-renderiza
   ultimoEstadoJSON = '';
+  // Renderiza imediatamente sem esperar Firebase (UI instantânea)
+  renderizar(true);
   if(campos) {
     const parcial = {};
     campos.forEach(c => { parcial[c] = estado[c]; });
@@ -1054,6 +1057,15 @@ window.removerDivida = async function(id) {
   if(d) regHist('removido',d.nome,d.valor);
   estado.dividas = estado.dividas.filter(d=>d.id!==id);
   await salvar(['dividas','historico']); renderizar(); notif('🗑 Removido');
+};
+
+window.redefinirDividas = async function() {
+  if(!confirm('Isso vai substituir TODAS as dívidas pelos dados padrão. Confirmar?')) return;
+  estado.dividas = JSON.parse(JSON.stringify(INICIAIS.dividas));
+  estado.nid = INICIAIS.nid;
+  regHist('reset', 'Dívidas redefinidas para padrão', 0);
+  await salvar(['dividas','nid','historico']);
+  notif('✅ Dívidas redefinidas!');
 };
 
 // ── RECEITAS ──────────────────────────────────────────────────────────────────
@@ -1339,7 +1351,6 @@ async function init() {
       estado = migrarEstado(JSON.parse(JSON.stringify(INICIAIS)));
       renderizar(true);
       esconderLoading();
-      notif('⚠️ Sem conexão — modo offline');
     }
   }, 6000);
 
@@ -1350,7 +1361,7 @@ async function init() {
     }
 
     onSnapshot(REF, snap => {
-      clearTimeout(timeoutId); // Firebase respondeu, cancela timeout
+      clearTimeout(timeoutId);
       if(snap.exists()) {
         estado = migrarEstado(snap.data());
         verificarResetMensal();
@@ -1362,13 +1373,11 @@ async function init() {
     });
   } catch(err) {
     clearTimeout(timeoutId);
-    // Firebase falhou completamente — usa dados locais ou iniciais
     if(!estado) {
       estado = migrarEstado(JSON.parse(JSON.stringify(INICIAIS)));
       renderizar(true);
       esconderLoading();
     }
-    notif('⚠️ Firebase offline — usando dados locais');
     setSyncDot('');
   }
 }
