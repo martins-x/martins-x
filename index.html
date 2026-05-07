@@ -902,15 +902,6 @@ async function salvar() {
   setSyncDot('ok');
 }
 
-function logDebug(msg) {
-  const el = document.getElementById('loading');
-  if(el) { const p = el.querySelector('p'); if(p) p.textContent = msg; }
-}
-
-function esconderLoading() {
-  const el = document.getElementById('loading');
-  if(el) el.style.display = 'none';
-}
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 const fmt     = v => 'R$ ' + v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
@@ -1304,45 +1295,53 @@ window.notif = function(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
 };
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
-async function init() {
-  document.getElementById('data-hoje').textContent =
-    new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
-
-  try {
-    const snap = await getDoc(REF);
-    if(!snap.exists()) await setDoc(REF, INICIAIS);
-
-    onSnapshot(REF, snap => {
-      if(snap.exists()) {
-        estado = migrarEstado(snap.data());
-        verificarResetMensal();
-        renderizar(true);
-        setSyncDot('ok');
-        esconderLoading();
-      }
-    });
-  } catch(err) {
-    // Sem conexão — mostra dados iniciais
-    estado = migrarEstado(JSON.parse(JSON.stringify(INICIAIS)));
-    renderizar(true);
-    esconderLoading();
-    setSyncDot('');
-  }
-}
-
-init();
+// ── MIGRAÇÃO ──────────────────────────────────────────────────────────────────
+function migrarEstado(e) {
   if(!e) return e;
   if(!e.gastos)    e.gastos = [];
   if(!e.receitas)  e.receitas = [];
   if(!e.historico) e.historico = [];
   if(!e.dividas)   e.dividas = [];
-  // Adiciona campo tipo em dívidas que não têm (dados antigos do Firestore)
   e.dividas = e.dividas.map(d => ({
     tipo: d.parcelas > 1 ? 'parcelas' : 'assinatura',
-    ...d,                    // tipo do Firestore sobrescreve se já existir
+    ...d,
   }));
   return e;
+}
+
+function esconderLoading() {
+  const el = document.getElementById('loading');
+  if(el) el.style.display = 'none';
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function init() {
+  document.getElementById('data-hoje').textContent =
+    new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
+
+  // onSnapshot primeiro — funciona mesmo sem getDoc no Safari
+  onSnapshot(REF, snap => {
+    if(snap.exists()) {
+      estado = migrarEstado(snap.data());
+      verificarResetMensal();
+      renderizar(true);
+      setSyncDot('ok');
+      esconderLoading();
+    }
+  }, err => {
+    // Erro no listener — mostra dados iniciais
+    if(!estado) {
+      estado = migrarEstado(JSON.parse(JSON.stringify(INICIAIS)));
+      renderizar(true);
+      esconderLoading();
+    }
+  });
+
+  // Cria documento se não existir
+  try {
+    const snap = await getDoc(REF);
+    if(!snap.exists()) await setDoc(REF, INICIAIS);
+  } catch(e) {}
 }
 
 init();
